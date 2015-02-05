@@ -42,9 +42,9 @@ public class ClientGUI {
 
         String server = "127.0.0.1";
         final ConnectInterface ci = (ConnectInterface) Naming.lookup("//" + server + "/DocsRMI");
-
-//        InitialContext ic = new InitialContext();
-//        final ConnectInterface ci = (ConnectInterface)ic.lookup("//10.10.1.3/nikitot");
+//      modules/glassfish-naming
+//      InitialContext ic = new InitialContext();
+//      final ConnectInterface ci = (ConnectInterface)ic.lookup("//10.10.1.3/nikitot");
 
         loginOrCreateButton.addActionListener(new ActionListener() {
             @Override
