@@ -1,13 +1,14 @@
+import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
 import java.net.MalformedURLException;
-import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.Properties;
 import java.util.Vector;
 
 /**
@@ -36,15 +37,23 @@ public class ClientGUI {
     ArrayList<Boolean> writeStatuses = new ArrayList<Boolean>();
 
 
-    public ClientGUI() throws RemoteException, NotBoundException, MalformedURLException, NamingException {
+    public ClientGUI() throws NotBoundException, MalformedURLException, NamingException {
         newDocButton.setEnabled(false);
         newDocNameField.setEnabled(false);
 
-        String server = "10.10.1.3";
-        final ConnectionInterface ci = (ConnectionInterface) Naming.lookup("//" + server + "/1527");
+        Properties props = new Properties();
+        props.setProperty("java.naming.factory.initial", "com.sun.enterprise.naming.SerialInitContextFactory");
+        props.setProperty("java.naming.factory.url.pkgs", "com.sun.enterprise.naming");
+        props.setProperty("java.naming.factory.state", "com.sun.corba.ee.impl.presentation.rmi.JNDIStateFactoryImpl");
 
-//        InitialContext ic = new InitialContext();
-//        final ConnectionInterface ci = (ConnectionInterface)ic.lookup("//10.10.1.3/nikitot");
+        props.setProperty("org.omg.CORBA.ORBInitialHost", "192.168.43.118");//ur server ip
+        props.setProperty("org.omg.CORBA.ORBInitialPort", "3700"); //default is 3700
+
+
+
+        InitialContext ic = new InitialContext(props);
+        final ClientSessionBeanRemote ci = (ClientSessionBeanRemote) ic.lookup("java:global/nikitot_ee/nikitot-ejb/RoolaccessLogic!nikejbpac.ClientSessionBeanRemote"/*"corbaname:iiop:192.168.43.118:3700#global/nikitot_ee/nikitot-ejb/RoolaccessLogic"*/);
+
 
         loginOrCreateButton.addActionListener(new ActionListener() {
             @Override
@@ -60,7 +69,7 @@ public class ClientGUI {
                             statusLabel.setForeground(new Color(200, 0, 0));
                         }
                     } else {
-                        if (ci.checkUser(loginFiled.getText(), passwordField.getText())) {
+                        if (ci.loginUser(loginFiled.getText(), passwordField.getText())) {
                             statusLabel.setText("Hello master " + loginFiled.getText() + "!");
                             statusLabel.setForeground(new Color(0, 128, 0));
                             newDocButton.setEnabled(true);
@@ -99,25 +108,20 @@ public class ClientGUI {
                             String author = tokens[0];
                             String docName = tokens[1];
 
-                            try {
-                                if (homeTabbedPane.getSelectedIndex() > 0) {
-                                    writeStatuses.set(i - 1, ci.writeStatus(
-                                            homeTabbedPane.getTitleAt(i), loginFiled.getText()
-                                    ));
+                            if (homeTabbedPane.getSelectedIndex() > 0) {
+                                writeStatuses.set(i - 1, ci.writeStatus(
+                                        homeTabbedPane.getTitleAt(i), loginFiled.getText()
+                                ));
 
-                                    if (writeStatuses.get(i - 1)) {
-                                        homeTabbedPane.setForegroundAt(i,Color.blue);
-                                        String textClient = docsList.get(i - 1).getText();
-                                        ci.updateDocument(textClient, docName, author);
-                                    } else {
-                                        homeTabbedPane.setForegroundAt(i,Color.gray);
-                                        String textServer = ci.getDocument(docName, author);
-                                        docsList.get(i - 1).setText(textServer);                    //Обновляем текст документа в клиенте
-                                    }
+                                if (writeStatuses.get(i - 1)) {
+                                    homeTabbedPane.setForegroundAt(i, Color.blue);
+                                    String textClient = docsList.get(i - 1).getText();
+                                    ci.updateDocumentText(textClient, docName, author);
+                                } else {
+                                    homeTabbedPane.setForegroundAt(i, Color.gray);
+                                    String textServer = ci.getDocumentText(docName, author);
+                                    docsList.get(i - 1).setText(textServer);                    //Обновляем текст документа в клиенте
                                 }
-
-                            } catch (RemoteException e1) {
-                                e1.printStackTrace();
                             }
                         }
                     }
@@ -126,14 +130,10 @@ public class ClientGUI {
 
                 if (homeTabbedPane.getTabCount() > 1) {
                     for (int i = 1; i < homeTabbedPane.getTabCount(); i++) {
-                        try {
-                            String fullDocname = homeTabbedPane.getTitleAt(i);
-                            String masterlogin = loginFiled.getText();
+                        String fullDocname = homeTabbedPane.getTitleAt(i);
+                        String masterlogin = loginFiled.getText();
 
-                            ci.writeStatus(fullDocname, masterlogin);
-                        } catch (RemoteException e1) {
-                            e1.printStackTrace();
-                        }
+                        ci.writeStatus(fullDocname, masterlogin);
                     }
                 }
 
@@ -210,11 +210,7 @@ public class ClientGUI {
         newDocButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                try {
-                    ci.createDocument(newDocNameField.getText(), loginFiled.getText(), "");
-                } catch (RemoteException e1) {
-                    e1.printStackTrace();
-                }
+                ci.createDocument(newDocNameField.getText(), loginFiled.getText(), "");
             }
         });
         tableDocs.addMouseListener(new MouseAdapter() {
@@ -235,37 +231,28 @@ public class ClientGUI {
                             JTextArea docsArea = addDocsTab.getTextArea();
                             JTable usersTable = addDocsTab.getTable();
 
-                            ArrayList<String> usersDoc = ci.getDocumentInfo(docName);
+                            //ArrayList<String> usersDoc = ci.getDocumentInfo(docName);
+                            String usersData[][] = ci.getAllUserFromDoc(docName, author);
 
                             Vector<String> colsName = new Vector<String>();
                             colsName.add("User");
                             colsName.add("Exclusive access");
 
-                            Vector<String> vectorList = new Vector<String>(usersDoc);
                             DefaultTableModel usersTableModel = new DefaultTableModel(colsName, 0);
                             usersTable.setModel(usersTableModel);
 
-                            for (String aVectorList : vectorList) {
+                            for (String[] anUsersData : usersData) {
                                 try {
                                     Vector<String> row = new Vector<String>();
-                                    String[] tokens = aVectorList.split("/");
-                                    row.add(tokens[0]);
-                                    if (tokens[1].equals(String.valueOf(1)))
-                                        row.add("true");
-                                    else
-                                        row.add("false");
+                                    row.add(usersData[i][0]);
+                                    row.add(usersData[i][0]);
 
                                     usersTableModel.addRow(row);
                                     usersTable.setModel(usersTableModel);
                                 } catch (Exception ignore) {
                                 }
                             }
-
-                            try {
-                                docsArea.setText(ci.getDocument(docName, author));
-                            } catch (RemoteException e1) {
-                                e1.printStackTrace();
-                            }
+                            docsArea.setText(ci.getDocumentText(docName, author));
                             docsList.add(docsArea);
                             homeTabbedPane.addTab(author + ":" + docName, panel);
                         }
@@ -280,15 +267,11 @@ public class ClientGUI {
         homeTabbedPane.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
-                    try {
-                        if (homeTabbedPane.getSelectedIndex() > 0) {
-                            String docFullName = homeTabbedPane.getTitleAt(homeTabbedPane.getSelectedIndex());
-                            String masterlogin = loginFiled.getText();
-                            writeStatuses.set(homeTabbedPane.getSelectedIndex() - 1, ci.setWriter(docFullName, masterlogin));
+                    if (homeTabbedPane.getSelectedIndex() > 0) {
+                        String docFullName = homeTabbedPane.getTitleAt(homeTabbedPane.getSelectedIndex());
+                        String masterlogin = loginFiled.getText();
+                        writeStatuses.set(homeTabbedPane.getSelectedIndex() - 1, ci.setWriter(docFullName, masterlogin));
 
-                        }
-                    } catch (RemoteException e1) {
-                        e1.printStackTrace();
                     }
                 }
             }
@@ -303,33 +286,24 @@ public class ClientGUI {
         });
     }
 
-    private void updateDocsTable(ConnectionInterface ci) throws RemoteException {
+    private void updateDocsTable(ClientSessionBeanRemote ci) throws RemoteException {
         Vector<String> colsName = new Vector<String>();
         colsName.add("Name");
         colsName.add("Author");
         colsName.add("Exclusive access");
 
-        ArrayList<String> arrayList = ci.getAllDocsFromUser(loginFiled.getText());
-        Vector<String> vectorList = new Vector<String>(arrayList);
+        String userDocList[][] = ci.getAllDocsFromUser(loginFiled.getText());
         DefaultTableModel tableDocsModel = new DefaultTableModel(colsName, 0);
         tableDocs.setModel(tableDocsModel);
 
-        for (String aVectorList : vectorList) {
-            try {
-                Vector<String> row = new Vector<String>();
-                String delims = "/";
-                String[] tokens = aVectorList.split(delims);
-                row.add(tokens[1]);
-                row.add(tokens[0]);
-                if (tokens[2].equals(String.valueOf(1)))
-                    row.add("true");
-                else
-                    row.add("false");
+        for (int i = 0; i < userDocList.length; i++) {
+            Vector<String> row = new Vector<String>();
+            row.add(userDocList[i][0]);
+            row.add(userDocList[i][1]);
+            row.add(userDocList[i][2]);
 
-                tableDocsModel.addRow(row);
-                tableDocs.setModel(tableDocsModel);
-            } catch (Exception ignore) {
-            }
+            tableDocsModel.addRow(row);
+            tableDocs.setModel(tableDocsModel);
         }
     }
 
