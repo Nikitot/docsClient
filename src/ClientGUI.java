@@ -40,11 +40,11 @@ public class ClientGUI {
         newDocButton.setEnabled(false);
         newDocNameField.setEnabled(false);
 
-        String server = "10.10.1.3";
-        final ConnectionInterface ci = (ConnectionInterface) Naming.lookup("//" + server + "/1527");
-
-//        InitialContext ic = new InitialContext();
-//        final ConnectionInterface ci = (ConnectionInterface)ic.lookup("//10.10.1.3/nikitot");
+        String server = "127.0.0.1";
+        final ConnectInterface ci = (ConnectInterface) Naming.lookup("//" + server + "/DocsRMI");
+//      modules/glassfish-naming
+//      InitialContext ic = new InitialContext();
+//      final ConnectInterface ci = (ConnectInterface)ic.lookup("//10.10.1.3/nikitot");
 
         loginOrCreateButton.addActionListener(new ActionListener() {
             @Override
@@ -303,7 +303,7 @@ public class ClientGUI {
         });
     }
 
-    private void updateDocsTable(ConnectionInterface ci) throws RemoteException {
+    private void updateDocsTable(ConnectInterface ci) throws RemoteException {
         Vector<String> colsName = new Vector<String>();
         colsName.add("Name");
         colsName.add("Author");

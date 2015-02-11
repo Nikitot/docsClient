@@ -9,7 +9,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 
-public interface ConnectionInterface extends Remote {
+public interface ConnectInterface extends Remote {
 //    boolean createUser(String login, String password);
 //
 //    boolean loginUser(String login, String password);
